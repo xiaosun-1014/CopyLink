@@ -20,6 +20,44 @@ async function waitForSettledPage(page) {
   await page.waitForLoadState('networkidle').catch(() => {});
 }
 
+async function removeCopylinkOverlays(page) {
+  if (typeof page.evaluate !== 'function') return;
+  await page
+    .evaluate(() => {
+      const selectors = '#copylink-recorder-panel,#copylink-overlay';
+      document.querySelectorAll(selectors).forEach((element) => element.remove());
+      document.querySelectorAll('iframe').forEach((frame) => {
+        try {
+          frame.contentDocument
+            ?.querySelectorAll(selectors)
+            .forEach((element) => element.remove());
+        } catch {
+          // Cross-origin frames cannot be cleaned from the parent page.
+        }
+      });
+    })
+    .catch(() => {});
+}
+
+async function captureViewportScreenshot(page, filePath) {
+  await removeCopylinkOverlays(page);
+  await page.screenshot({
+    path: filePath,
+    fullPage: false,
+  });
+}
+
+async function waitForViewerReady(page, profile, options = {}) {
+  await waitForSettledPage(page);
+  if (profile && typeof profile.waitForViewerReady === 'function') {
+    await profile.waitForViewerReady(page, options).catch(() => {});
+  }
+  const waitMs = options.viewerWaitMs ?? 3000;
+  if (waitMs > 0 && typeof page.waitForTimeout === 'function') {
+    await page.waitForTimeout(waitMs).catch(() => {});
+  }
+}
+
 async function captureCase(url, outDir, options = {}) {
   ensureDir(outDir);
   const viewport = options.viewport || { width: 1440, height: 960 };
@@ -39,10 +77,7 @@ async function captureCase(url, outDir, options = {}) {
 
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: options.timeoutMs || 30000 });
     await waitForSettledPage(page);
-    await page.screenshot({
-      path: path.join(outDir, 'report.png'),
-      fullPage: true,
-    });
+    await captureViewportScreenshot(page, path.join(outDir, 'report.png'));
 
     const actions = [];
     const openViewer = await profile.findOpenViewer(page);
@@ -66,11 +101,8 @@ async function captureCase(url, outDir, options = {}) {
       await openViewer.locator.click();
       const popup = await popupPromise;
       const viewerPage = popup || page;
-      await waitForSettledPage(viewerPage);
-      await viewerPage.screenshot({
-        path: path.join(outDir, 'viewer.png'),
-        fullPage: true,
-      });
+      await waitForViewerReady(viewerPage, profile, options);
+      await captureViewportScreenshot(viewerPage, path.join(outDir, 'viewer.png'));
       hasViewer = true;
     }
 
@@ -103,4 +135,7 @@ async function captureCase(url, outDir, options = {}) {
 
 module.exports = {
   captureCase,
+  captureViewportScreenshot,
+  removeCopylinkOverlays,
+  waitForViewerReady,
 };

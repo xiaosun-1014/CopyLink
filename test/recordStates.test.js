@@ -1,5 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 
 const {
   recordStates,
@@ -70,4 +73,58 @@ test('recordStates installs shortcut script at browser context level', async () 
     ['contextAddInitScript', true],
   ]);
   assert.deepEqual(calls.filter((call) => call[0] === 'contextOn'), [['contextOn', 'page']]);
+});
+
+test('recordStates captures page states with viewport-sized screenshots', async () => {
+  const caseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'copylink-record-states-viewport-'));
+  fs.writeFileSync(
+    path.join(caseDir, 'manifest.json'),
+    JSON.stringify({
+      id: 'case_a',
+      vendor: 'zscloud',
+      viewport: { width: 1440, height: 960 },
+      screenshots: { report: 'report.png', viewer: 'viewer.png' },
+    }),
+  );
+
+  const calls = [];
+  const functionResults = [false, 'viewer_layout_menu', undefined, true];
+  const fakePage = {
+    async goto() {},
+    async waitForLoadState() {},
+    async evaluate(input) {
+      if (typeof input === 'string') return undefined;
+      return functionResults.shift();
+    },
+    async screenshot(options) {
+      calls.push(['screenshot', path.basename(options.path), options.fullPage]);
+      fs.writeFileSync(options.path, '');
+    },
+    async waitForTimeout() {},
+  };
+  const fakeChromium = {
+    async launch() {
+      return {
+        async newContext() {
+          return {
+            async addInitScript() {},
+            on() {},
+            async newPage() {
+              return fakePage;
+            },
+          };
+        },
+        async close() {},
+      };
+    },
+  };
+
+  const captured = await recordStates(caseDir, 'https://example.test', {
+    chromium: fakeChromium,
+  });
+
+  assert.deepEqual(captured, [
+    { page: 'viewer_layout_menu', screenshot: 'viewer_layout_menu.png' },
+  ]);
+  assert.deepEqual(calls, [['screenshot', 'viewer_layout_menu.png', false]]);
 });

@@ -1,0 +1,16 @@
+{
+  "id": "zscloud_xg06q2",
+  "vendor": "zscloud",
+  "viewport": {
+    "width": 1440,
+    "height": 960
+  },
+  "screenshots": {
+    "report": "report.png",
+    "viewer": "viewer.png"
+  },
+  "source": {
+    "originalUrlHash": "e482d8dc07345fdc4f17f8ec535da3129187b982ed16f52bba98b09c3d6643aa",
+    "capturedAt": "2026-06-25T09:07:41.835Z"
+  }
+}

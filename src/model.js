@@ -35,14 +35,25 @@ function sanitizeAction(action) {
   };
 }
 
+function sanitizeFlowStep(step) {
+  return {
+    id: step.id,
+    screenshot: step.screenshot,
+    nextScreenshot: step.nextScreenshot,
+    click: step.click ? normalizeBox(step.click) : undefined,
+    ...(step.label ? { label: step.label } : {}),
+  };
+}
+
 function sanitizeCaseData(caseData) {
   const manifest = caseData.manifest || {};
   const source = manifest.source || {};
+  const flow = caseData.flow;
   const runtimeId =
     source.originalUrlHash && manifest.vendor
       ? `${safeSegment(manifest.vendor, 'vendor')}_${String(source.originalUrlHash).slice(0, 10)}`
       : manifest.id;
-  return {
+  const safeData = {
     manifest: {
       id: runtimeId,
       vendor: manifest.vendor,
@@ -57,6 +68,16 @@ function sanitizeCaseData(caseData) {
       actions: ((caseData.actions && caseData.actions.actions) || []).map(sanitizeAction),
     },
   };
+
+  if (flow && Array.isArray(flow.steps)) {
+    safeData.flow = {
+      version: flow.version || 1,
+      startScreenshot: flow.startScreenshot,
+      steps: flow.steps.map(sanitizeFlowStep),
+    };
+  }
+
+  return safeData;
 }
 
 module.exports = {

@@ -26,7 +26,7 @@ The tool does not capture:
 
 CopyLink has three boundaries:
 
-- `recorder`: opens a real link with Playwright, captures screenshots, detects vendor-specific buttons, and writes `manifest.json` plus `actions.json`.
+- `recorder`: opens a real link with Playwright, captures screenshots, detects vendor-specific buttons, and writes `manifest.json` plus `actions.json`. Baseline `capture` does not inject the recorder panel; it removes old CopyLink overlays before screenshots and waits for the viewer to settle before saving `viewer.png`.
 - `builder`: copies runtime assets and emits `case-data.js` so a case can run as a local static page.
 - `runtime`: displays screenshots, overlays clickable hotspots, and simulates required actions.
 
@@ -95,12 +95,16 @@ These hotspots include `data-agent-action` markers and are transparent over the 
 - `Ctrl/Cmd+Shift+S`: show the overlay input for a page id, then capture the current browser state.
 - `Ctrl/Cmd+Shift+Q`: stop recording.
 
-`record-actions` opens the real page and records clicked controls with the same overlay input:
+`record-actions` opens the real page and records clicked controls with a persistent recorder panel:
 
-- Click a real control, then fill `action,targetPage,value,page` in the overlay.
+- Choose a mode in the recorder panel, then click the real control once.
+- Modes cover the common imaging workflow: open viewer, open layout menu, set layout, double-click series selection, show DICOM info, close dialog, and separate WW then WL recording.
+- `open_series_menu` remains available for systems that require a separate series menu, but the normal zscloud flow can double-click a visible series directly.
+- Menu/dialog-opening actions automatically capture and register the target screenshot state.
 - `Ctrl/Cmd+Shift+P`: update the current page id.
-- `Ctrl/Cmd+Shift+Q`: stop recording.
+- `q` or `Ctrl/Cmd+Shift+Q`: stop recording.
 - For `select_series`, if `value` is omitted, the clicked text becomes a stable uppercase value.
+- `0 - Manual CSV` keeps the old `action,targetPage,value,page` overlay for unusual actions.
 
 ## Verification
 

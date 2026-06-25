@@ -149,7 +149,7 @@ async function recordStates(caseDir, url, options = {}) {
           const screenshot = screenshotNameForPage(pageId);
           await activePage.screenshot({
             path: path.join(caseDir, screenshot),
-            fullPage: true,
+            fullPage: false,
           });
           addPage(caseDir, pageId, screenshot);
           captured.push({ page: pageId, screenshot });

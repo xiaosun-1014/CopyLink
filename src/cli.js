@@ -4,6 +4,7 @@ const { addPage } = require('./actions/addPage');
 const { buildCase } = require('./builder/buildCase');
 const { captureCase } = require('./recorder/capture');
 const { recordActions } = require('./recorder/recordActions');
+const { recordFlow } = require('./recorder/recordFlow');
 const { recordStates } = require('./recorder/recordStates');
 const { pickProfile } = require('./recorder/profiles');
 const { createCaseId } = require('./model');
@@ -12,12 +13,13 @@ const { serveCase } = require('./server/serveCase');
 function usage() {
   return [
     'Usage:',
-    '  copylink capture <url> [--out <case-dir>]',
+    '  copylink capture <url> [--out <case-dir>] [--viewer-wait-ms <ms>]',
     '  copylink build <case-dir>',
     '  copylink add-page <case-dir> <page> <screenshot>',
     '  copylink add-action <case-dir> <page> <action> --box <x,y,width,height> [--text <label>]',
     '  copylink record-states <case-dir> <url>',
     '  copylink record-actions <case-dir> <url> [--page <page-id>]',
+    '  copylink record-flow <case-dir> <url> [--page <page-id>]',
     '  copylink serve <case-dir> [--port <port>]',
   ].join('\n');
 }
@@ -26,6 +28,16 @@ function flagValue(args, flagName) {
   const index = args.indexOf(flagName);
   if (index === -1) return undefined;
   return args[index + 1];
+}
+
+function optionalNumberFlag(args, flagName) {
+  const value = flagValue(args, flagName);
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error(`Expected ${flagName} <non-negative-ms>`);
+  }
+  return parsed;
 }
 
 function parseBox(value) {
@@ -52,7 +64,13 @@ function parseCommand(argv) {
     if (!url) throw new Error(usage());
     const profile = pickProfile(url);
     const outDir = flagValue(args, '--out') || path.join('cases', createCaseId(url, profile.vendor));
-    return { command, url, outDir };
+    const viewerWaitMs = optionalNumberFlag(args, '--viewer-wait-ms');
+    return {
+      command,
+      url,
+      outDir,
+      ...(viewerWaitMs !== undefined ? { viewerWaitMs } : {}),
+    };
   }
 
   if (command === 'build') {
@@ -115,12 +133,27 @@ function parseCommand(argv) {
     };
   }
 
+  if (command === 'record-flow') {
+    const caseDir = args[1];
+    const url = args[2];
+    if (!caseDir || !url) throw new Error(usage());
+    return {
+      command,
+      caseDir,
+      url,
+      page: flagValue(args, '--page') || 'report',
+    };
+  }
+
   throw new Error(usage());
 }
 
 async function runCommand(parsed, options = {}) {
   if (parsed.command === 'capture') {
-    return captureCase(parsed.url, parsed.outDir, options.captureOptions || {});
+    return captureCase(parsed.url, parsed.outDir, {
+      ...(options.captureOptions || {}),
+      ...(parsed.viewerWaitMs !== undefined ? { viewerWaitMs: parsed.viewerWaitMs } : {}),
+    });
   }
 
   if (parsed.command === 'build') {
@@ -151,6 +184,10 @@ async function runCommand(parsed, options = {}) {
 
   if (parsed.command === 'record-actions') {
     return recordActions(parsed.caseDir, parsed.url, { page: parsed.page });
+  }
+
+  if (parsed.command === 'record-flow') {
+    return recordFlow(parsed.caseDir, parsed.url, { page: parsed.page });
   }
 
   throw new Error(usage());

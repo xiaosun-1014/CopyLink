@@ -59,3 +59,42 @@ test('sanitizeCaseData removes raw URLs before generating offline case data', ()
   assert.equal(JSON.stringify(caseData).includes('patientId'), false);
   assert.equal(JSON.stringify(caseData).includes('xg06q2'), false);
 });
+
+test('sanitizeCaseData preserves link-specific click flow replay data', () => {
+  const caseData = sanitizeCaseData({
+    manifest: {
+      id: 'zscloud_a',
+      vendor: 'zscloud',
+      viewport: { width: 1440, height: 960 },
+      screenshots: { report: 'report.png', viewer: 'viewer.png' },
+    },
+    actions: { actions: [] },
+    flow: {
+      version: 1,
+      startScreenshot: 'flow_000.png',
+      steps: [
+        {
+          id: 'flow_step_001',
+          screenshot: 'flow_000.png',
+          nextScreenshot: 'flow_001.png',
+          click: { x: 10.4, y: 20.6, width: 0, height: 0 },
+          label: 'open_viewer',
+        },
+      ],
+    },
+  });
+
+  assert.deepEqual(caseData.flow, {
+    version: 1,
+    startScreenshot: 'flow_000.png',
+    steps: [
+      {
+        id: 'flow_step_001',
+        screenshot: 'flow_000.png',
+        nextScreenshot: 'flow_001.png',
+        click: { x: 10, y: 21, width: 1, height: 1 },
+        label: 'open_viewer',
+      },
+    ],
+  });
+});

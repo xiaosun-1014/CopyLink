@@ -1,0 +1,41 @@
+{
+  "actions": [
+    {
+      "id": "open_viewer_1",
+      "page": "report",
+      "action": "open_viewer",
+      "text": "查看影像",
+      "box": {
+        "x": 1194,
+        "y": 30,
+        "width": 86,
+        "height": 24
+      },
+      "targetPage": "viewer"
+    },
+    {
+      "id": "open_viewer_2",
+      "page": "report",
+      "action": "open_viewer",
+      "box": {
+        "x": 1194,
+        "y": 0,
+        "width": 86,
+        "height": 30
+      },
+      "targetPage": "viewer"
+    },
+    {
+      "id": "open_viewer_3",
+      "page": "report",
+      "action": "open_viewer",
+      "box": {
+        "x": 1194,
+        "y": 0,
+        "width": 86,
+        "height": 30
+      },
+      "targetPage": "viewer"
+    }
+  ]
+}

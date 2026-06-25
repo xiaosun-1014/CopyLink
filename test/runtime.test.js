@@ -50,6 +50,38 @@ function sampleData() {
   };
 }
 
+function flowData() {
+  return {
+    manifest: {
+      viewport: { width: 1440, height: 960 },
+      screenshots: {
+        report: 'report.png',
+      },
+    },
+    actions: { actions: [] },
+    flow: {
+      version: 1,
+      startScreenshot: 'flow_000.png',
+      steps: [
+        {
+          id: 'flow_step_001',
+          screenshot: 'flow_000.png',
+          nextScreenshot: 'flow_001.png',
+          click: { x: 100, y: 120, width: 24, height: 24 },
+          label: 'open_viewer',
+        },
+        {
+          id: 'flow_step_002',
+          screenshot: 'flow_001.png',
+          nextScreenshot: 'flow_002.png',
+          click: { x: 40, y: 560, width: 24, height: 24 },
+          label: 'open_layout_menu',
+        },
+      ],
+    },
+  };
+}
+
 function fakeView() {
   const calls = [];
   return {
@@ -63,6 +95,7 @@ function fakeView() {
     },
     setHotspots(actions, onAction) {
       calls.push(['setHotspots', actions.map((action) => action.action)]);
+      this.hotspots = actions;
       this.hotspotHandler = onAction;
     },
     setViewerControls(state, onAction) {
@@ -87,6 +120,73 @@ test('runtime initializes report screenshot and report hotspots', () => {
     ['setHotspots', ['open_viewer']],
   ]);
   assert.equal(runtime.getState().currentPage, 'report');
+});
+
+test('runtime replays recorded click flow screenshots step by step', () => {
+  const view = fakeView();
+  const runtime = createRuntime({ data: flowData(), view });
+
+  runtime.init();
+
+  assert.deepEqual(view.calls.slice(0, 3), [
+    ['setViewport', 1440, 960],
+    ['setScreenshot', 'flow_000.png'],
+    ['setHotspots', ['flow_next']],
+  ]);
+  assert.equal(runtime.getState().currentPage, 'flow');
+  assert.equal(runtime.getState().flowIndex, 0);
+
+  view.hotspotHandler({ action: 'flow_next' });
+  assert.equal(runtime.getState().flowIndex, 1);
+  assert.deepEqual(view.calls.at(-2), ['setScreenshot', 'flow_001.png']);
+  assert.deepEqual(view.calls.at(-1), ['setHotspots', ['flow_next']]);
+
+  view.hotspotHandler({ action: 'flow_next' });
+  assert.equal(runtime.getState().flowIndex, 2);
+  assert.deepEqual(view.calls.at(-2), ['setScreenshot', 'flow_002.png']);
+  assert.deepEqual(view.calls.at(-1), ['setHotspots', []]);
+});
+
+test('runtime lets report open_viewer hotspot advance the first flow step', () => {
+  const data = flowData();
+  data.actions.actions = [
+    {
+      id: 'open_viewer_1',
+      page: 'report',
+      action: 'open_viewer',
+      text: '查看影像',
+      box: { x: 1194, y: 30, width: 86, height: 24 },
+      targetPage: 'viewer',
+    },
+  ];
+  const view = fakeView();
+  const runtime = createRuntime({ data, view });
+
+  runtime.init();
+
+  assert.deepEqual(
+    view.hotspots.map((action) => ({
+      action: action.action,
+      text: action.text,
+      box: action.box,
+    })),
+    [
+      {
+        action: 'flow_next',
+        text: 'open_viewer',
+        box: { x: 100, y: 120, width: 24, height: 24 },
+      },
+      {
+        action: 'flow_next',
+        text: '查看影像',
+        box: { x: 1186, y: 0, width: 102, height: 66 },
+      },
+    ],
+  );
+
+  view.hotspotHandler(view.hotspots[1]);
+  assert.equal(runtime.getState().flowIndex, 1);
+  assert.deepEqual(view.calls.at(-2), ['setScreenshot', 'flow_001.png']);
 });
 
 test('open_viewer switches to viewer screenshot and shows viewer controls', () => {
@@ -133,6 +233,32 @@ test('viewer actions update ww wl, layout, and selected series state', () => {
     layout: '1x2',
     seriesIndex: 2,
   });
+});
+
+test('runtime supports separate window width and window level actions', () => {
+  const view = fakeView();
+  const runtime = createRuntime({ data: sampleData(), view });
+
+  runtime.init();
+  runtime.runAction({ action: 'open_viewer', targetPage: 'viewer' });
+  runtime.runAction({ action: 'set_window_width', value: '1200' });
+  runtime.runAction({ action: 'set_window_level', value: '-500' });
+
+  assert.equal(runtime.getState().ww, 1200);
+  assert.equal(runtime.getState().wl, -500);
+});
+
+test('runtime nudges ww and wl when separate window actions have no value', () => {
+  const view = fakeView();
+  const runtime = createRuntime({ data: sampleData(), view });
+
+  runtime.init();
+  runtime.runAction({ action: 'open_viewer', targetPage: 'viewer' });
+  runtime.runAction({ action: 'set_window_width' });
+  runtime.runAction({ action: 'set_window_level' });
+
+  assert.equal(runtime.getState().ww, 450);
+  assert.equal(runtime.getState().wl, 50);
 });
 
 test('show_dicom_info opens modal with stable placeholder fields', () => {

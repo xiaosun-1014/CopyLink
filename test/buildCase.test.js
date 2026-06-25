@@ -50,8 +50,30 @@ function makeTempCase() {
       2,
     ),
   );
+  fs.writeFileSync(
+    path.join(caseDir, 'flow.json'),
+    JSON.stringify(
+      {
+        version: 1,
+        startScreenshot: 'flow_000.png',
+        steps: [
+          {
+            id: 'flow_step_001',
+            screenshot: 'flow_000.png',
+            nextScreenshot: 'flow_001.png',
+            click: { x: 1194, y: 30, width: 24, height: 24 },
+            label: 'open_viewer',
+          },
+        ],
+      },
+      null,
+      2,
+    ),
+  );
   fs.writeFileSync(path.join(caseDir, 'report.png'), '');
   fs.writeFileSync(path.join(caseDir, 'viewer.png'), '');
+  fs.writeFileSync(path.join(caseDir, 'flow_000.png'), '');
+  fs.writeFileSync(path.join(caseDir, 'flow_001.png'), '');
 
   return caseDir;
 }
@@ -68,5 +90,6 @@ test('buildCase copies runtime assets and emits sanitized case data', () => {
   const caseData = fs.readFileSync(path.join(caseDir, 'case-data.js'), 'utf8');
   assert.match(caseData, /window\.COPYLINK_CASE = /);
   assert.match(caseData, /open_viewer/);
+  assert.match(caseData, /flow_step_001/);
   assert.doesNotMatch(caseData, /shared\?code=xg06q2/);
 });

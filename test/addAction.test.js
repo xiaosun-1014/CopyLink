@@ -31,3 +31,26 @@ test('addAction appends a normalized viewer hotspot to actions.json', () => {
   });
   assert.deepEqual(saved.actions, [action]);
 });
+
+test('addAction returns existing action when page action target and value already exist', () => {
+  const caseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'copylink-action-'));
+  const existing = {
+    id: 'open_viewer_1',
+    page: 'report',
+    action: 'open_viewer',
+    box: { x: 1194, y: 30, width: 86, height: 24 },
+    targetPage: 'viewer',
+  };
+  fs.writeFileSync(path.join(caseDir, 'actions.json'), JSON.stringify({ actions: [existing] }));
+
+  const action = addAction(caseDir, {
+    page: 'report',
+    action: 'open_viewer',
+    box: { x: 1194, y: 0, width: 86, height: 30 },
+    targetPage: 'viewer',
+  });
+
+  const saved = JSON.parse(fs.readFileSync(path.join(caseDir, 'actions.json'), 'utf8'));
+  assert.deepEqual(action, existing);
+  assert.deepEqual(saved.actions, [existing]);
+});

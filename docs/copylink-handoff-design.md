@@ -120,9 +120,10 @@ src/cli.js
 支持命令：
 
 ```bash
-node bin/copylink.js capture <url>
+node bin/copylink.js capture <url> [--viewer-wait-ms <ms>]
 node bin/copylink.js record-states <case-dir> <url>
 node bin/copylink.js record-actions <case-dir> <url> --page <page-id>
+node bin/copylink.js record-flow <case-dir> <url> --page <page-id>
 node bin/copylink.js add-page <case-dir> <page-id> <screenshot>
 node bin/copylink.js add-action <case-dir> <page> <action> --box <x,y,w,h>
 node bin/copylink.js build <case-dir>
@@ -145,18 +146,29 @@ src/recorder/profiles/zscloud.js
 - 用 Playwright 打开真实 link。
 - 截取报告页和影像页。
 - 自动识别 `zscloud` 的 `查看影像` 入口。
-- 注入快捷键和页面内浮层，辅助采集额外状态和热区。
+- `capture` 不注入任何采集面板；截图前会清理旧的 CopyLink 浮层，避免把 recorder 拍进基础 case。
+- `record-states` / `record-actions` 才注入快捷键和页面内浮层，辅助采集额外状态和热区。
 
 `record-states` 用于快速采集弹窗/菜单截图：
 
 - `Ctrl/Cmd+Shift+S`：打开页面内输入浮层，输入 page id 后自动截图并注册到 `manifest.json`。
 - `Ctrl/Cmd+Shift+Q`：结束录制。
 
-`record-actions` 用于从真实点击自动生成热区：
+`record-actions` 用于从真实点击自动生成热区，并尽量让采集员按真实流程点一遍即可：
 
-- 点击真实按钮后，页面内浮层要求填写 `action,targetPage,value,page`。
-- 工具自动读取被点击元素的 bounding box 和文字。
-- 对于 `select_series`，如果 `value` 留空，会用被点击序列文字生成稳定值。
+- 页面右侧会出现 `CopyLink recorder` 常驻面板。
+- 先用面板按钮或数字快捷键选择动作模式，再点击真实控件。
+- 工具自动读取更合适的可点击元素 bounding box 和文字。
+- 打开菜单/弹窗类动作会在点击后自动截图并注册对应 `targetPage`。
+- 对于 `select_series`，工具会用被点击序列文字生成稳定值。
+- 遇到特殊动作时可以切到 `0 - Manual CSV`，保留旧的 `action,targetPage,value,page` 输入方式。
+
+`record-flow` 用于把一次真实操作过程录成线性截图轨迹：
+
+- 每个 link 都保存自己的 `flow.json` 和 `flow_000.png`、`flow_001.png` 等截图。
+- 每次真实点击会记录点击坐标，并在点击后保存下一张截图。
+- 离线页面按录制顺序回放：显示当前截图，只开放下一次点击的透明热区，点击后进入下一张截图。
+- 这个模式不依赖 viewer DOM 细节，适合多个 link 的界面细节不同但操作流程大致相同的场景。
 
 ### 4.3 Actions
 
@@ -213,7 +225,7 @@ runtime 不访问真实后端，不加载真实 DICOM，不调用原站接口。
 ### 5.1 基础采集
 
 ```bash
-node bin/copylink.js capture "https://zscloud.zs-hospital.sh.cn/film/#/shared?code=xg06q2"
+node bin/copylink.js capture "https://zscloud.zs-hospital.sh.cn/film/#/shared?code=xg06q2" --viewer-wait-ms 8000
 ```
 
 生成：
@@ -224,6 +236,8 @@ cases/zscloud_xg06q2/viewer.png
 cases/zscloud_xg06q2/manifest.json
 cases/zscloud_xg06q2/actions.json
 ```
+
+`--viewer-wait-ms` 用于影像页跳转后的额外稳定等待。默认会等一小段；如果影像页加载慢、截图还是太早，可以把它调到 `8000` 或 `12000`。
 
 ### 5.2 采集弹窗和菜单状态
 
@@ -244,30 +258,53 @@ node bin/copylink.js record-states cases/zscloud_xg06q2 "https://zscloud.zs-hosp
 
 ### 5.3 采集真实按钮热区
 
+如果主要目标是复现一次完整点击过程，优先使用 `record-flow`：
+
+```bash
+node bin/copylink.js record-flow cases/zscloud_xg06q2 "https://zscloud.zs-hospital.sh.cn/film/#/shared?code=xg06q2" --page report
+```
+
+在浏览器中按真实路径操作一遍，结束时按 `q`。工具会生成 `flow.json` 和一组 `flow_*.png`。多个 link 可以共用同一套录制方式，但每个 case 保留自己的截图和点击坐标。
+
+如果还需要语义化热区，再使用 `record-actions` 精修：
+
 ```bash
 node bin/copylink.js record-actions cases/zscloud_xg06q2 "https://zscloud.zs-hospital.sh.cn/film/#/shared?code=xg06q2" --page viewer
 ```
 
-每点击一个真实按钮，会出现页面内输入浮层。
+页面右侧会出现录制面板。推荐按真实操作路径录一遍：
 
-常用输入：
+1. 如果从报告页开始，选择 `8 - Open viewer`，点击 `查看影像`。
+2. 在 viewer 里选择 `1 - Open layout`，点击布局按钮；工具会自动保存 `viewer_layout_menu.png`。
+3. 选择 `2 - Set layout`，点击目标布局项；必要时在面板 `Value` 中填 `2x2`。
+4. 选择 `4 - Double-click series`，直接双击目标序列；序列文字会自动变成稳定 `value`。
+5. 如果某些系统必须先打开序列菜单，可选择 `3 - Open series` 作为兜底；常规 zscloud 流程不需要这一步。
+6. 选择 `5 - DICOM info`，点击 DICOM 信息入口；工具会自动保存 `viewer_dicom_info.png`。
+7. 选择 `6 - Close dialog`，点击关闭按钮。
+8. 选择 `7 - WW then WL`，先点击窗宽控件/数值，再点击窗位控件/数值；工具会分别记录 `set_window_width` 和 `set_window_level`。
+9. 按 `q` 结束；如果页面拦截了普通按键，再用 `Ctrl/Cmd+Shift+Q`。
+
+快捷键：
 
 ```text
-open_layout_menu,viewer_layout_menu
-set_layout,viewer,2x2,viewer_layout_menu
-open_series_menu,viewer_series_menu
-select_series,viewer,AXIAL_LUNG_THIN,viewer_series_menu
-show_dicom_info,viewer_dicom_info
-close_dialog,viewer,,viewer_dicom_info
+1 open_layout_menu
+2 set_layout
+3 open_series_menu fallback
+4 select_series by double-click
+5 show_dicom_info
+6 close_dialog
+7 set_window_width, then set_window_level
+8 open_viewer
+0 manual CSV fallback
 ```
 
-对于序列选择，如果不想手写稳定 ID，可以输入：
+`Ctrl/Cmd+Shift+P` 可手动修改当前 page。特殊情况下切到 manual 后，仍可输入旧格式：
 
 ```text
-select_series,viewer,,viewer_series_menu
+action,targetPage,value,page
 ```
 
-工具会把被点击序列文字自动转换成稳定值，例如：
+例如：
 
 ```text
 AXIAL LUNG THIN -> AXIAL_LUNG_THIN

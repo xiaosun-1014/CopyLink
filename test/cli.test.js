@@ -5,11 +5,21 @@ const { parseCommand } = require('../src/cli');
 
 test('parseCommand parses capture command with url and output directory', () => {
   assert.deepEqual(
-    parseCommand(['node', 'copylink', 'capture', 'https://example.test', '--out', 'cases/a']),
+    parseCommand([
+      'node',
+      'copylink',
+      'capture',
+      'https://example.test',
+      '--out',
+      'cases/a',
+      '--viewer-wait-ms',
+      '8000',
+    ]),
     {
       command: 'capture',
       url: 'https://example.test',
       outDir: 'cases/a',
+      viewerWaitMs: 8000,
     },
   );
 });
@@ -109,6 +119,26 @@ test('parseCommand parses record-actions command', () => {
       caseDir: 'cases/a',
       url: 'https://example.test/viewer',
       page: 'viewer',
+    },
+  );
+});
+
+test('parseCommand parses record-flow command', () => {
+  assert.deepEqual(
+    parseCommand([
+      'node',
+      'copylink',
+      'record-flow',
+      'cases/a',
+      'https://example.test/report',
+      '--page',
+      'report',
+    ]),
+    {
+      command: 'record-flow',
+      caseDir: 'cases/a',
+      url: 'https://example.test/report',
+      page: 'report',
     },
   );
 });

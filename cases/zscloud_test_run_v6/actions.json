@@ -1,0 +1,17 @@
+{
+  "actions": [
+    {
+      "id": "open_viewer_1",
+      "page": "report",
+      "action": "open_viewer",
+      "text": "查看影像",
+      "box": {
+        "x": 1194,
+        "y": 30,
+        "width": 86,
+        "height": 24
+      },
+      "targetPage": "viewer"
+    }
+  ]
+}
