@@ -1,0 +1,33 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+
+const { addAction } = require('../src/actions/addAction');
+
+test('addAction appends a normalized viewer hotspot to actions.json', () => {
+  const caseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'copylink-action-'));
+  fs.writeFileSync(path.join(caseDir, 'actions.json'), JSON.stringify({ actions: [] }));
+
+  const action = addAction(caseDir, {
+    page: 'viewer',
+    action: 'show_dicom_info',
+    text: 'DICOM',
+    box: { x: 10.2, y: 20.7, width: 30.1, height: 40.9 },
+    targetPage: 'viewer_dicom_info',
+    value: 'info',
+  });
+
+  const saved = JSON.parse(fs.readFileSync(path.join(caseDir, 'actions.json'), 'utf8'));
+  assert.deepEqual(action, {
+    id: 'show_dicom_info_1',
+    page: 'viewer',
+    action: 'show_dicom_info',
+    text: 'DICOM',
+    box: { x: 10, y: 21, width: 30, height: 41 },
+    targetPage: 'viewer_dicom_info',
+    value: 'info',
+  });
+  assert.deepEqual(saved.actions, [action]);
+});

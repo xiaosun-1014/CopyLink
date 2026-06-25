@@ -1,0 +1,17 @@
+{
+  "name": "copylink-layout-freezer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Capture expiring medical report links into offline clickable GUIAgent training pages.",
+  "bin": {
+    "copylink": "bin/copylink.js"
+  },
+  "scripts": {
+    "test": "node --test",
+    "build": "node bin/copylink.js build"
+  },
+  "dependencies": {
+    "playwright": "^1.56.0"
+  },
+  "devDependencies": {}
+}
